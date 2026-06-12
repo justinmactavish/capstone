@@ -1,0 +1,1173 @@
+<!doctype html>
+
+<head>
+    <title>Hbot &mdash; Live Dashboard</title>
+    <script src="jquery-4.0.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            padding: 24px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+
+        h1 {
+            color: #00d4ff;
+            margin-bottom: 4px;
+        }
+
+        h2 {
+            color: #00d4ff;
+            margin-top: 28px;
+            margin-bottom: 10px;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .timestamp {
+            font-size: 0.75em;
+            color: #888;
+            margin-bottom: 20px;
+        }
+
+        /* ── Two-column layout ── */
+        .dashboard-layout {
+            display: flex;
+            gap: 40px;
+            align-items: flex-start;
+        }
+
+        .left-panel {
+            flex: 0 0 500px;
+        }
+
+        .right-panel {
+            flex: 1;
+            position: sticky;
+            top: 24px;
+        }
+
+        /* ── Tables ── */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+
+        td,
+        th {
+            border: 1px solid #333;
+            padding: 8px 12px;
+        }
+
+        th {
+            background: #16213e;
+            color: #aaccee;
+            text-align: left;
+            width: 42%;
+            font-weight: normal;
+            font-size: 0.9em;
+        }
+
+        td {
+            background: #0f3460;
+            font-family: monospace;
+        }
+
+        /* ── Value colours ── */
+        .value {
+            color: #00ff99;
+            font-weight: bold;
+        }
+
+        .value-warn {
+            color: #ffaa00;
+            font-weight: bold;
+        }
+
+        .value-danger {
+            color: #ff4444;
+            font-weight: bold;
+        }
+
+        /* ── Flag badges ── */
+        .flag-on {
+            background: #00ff99;
+            color: #000;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.82em;
+            font-weight: bold;
+        }
+
+        .flag-off {
+            background: #333;
+            color: #888;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.82em;
+        }
+
+        .flag-warn {
+            background: #ffaa00;
+            color: #000;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.82em;
+            font-weight: bold;
+        }
+
+        .flag-alert {
+            background: #ff4444;
+            color: #fff;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.82em;
+            font-weight: bold;
+        }
+
+        /* ── Speed bar ── */
+        .speed-bg {
+            background: #1a1a2e;
+            border-radius: 4px;
+            height: 14px;
+            width: 140px;
+            display: inline-block;
+            vertical-align: middle;
+            border: 1px solid #333;
+            margin-right: 8px;
+        }
+
+        .speed-fill {
+            border-radius: 3px;
+            height: 14px;
+            transition: width 0.4s, background 0.4s;
+        }
+
+        /* ── Redline bar ── */
+        .redline-bg {
+            background: #1a1a2e;
+            border-radius: 4px;
+            height: 14px;
+            width: 160px;
+            display: inline-block;
+            vertical-align: middle;
+            border: 1px solid #333;
+            margin-right: 8px;
+        }
+
+        .redline-fill {
+            border-radius: 3px;
+            height: 14px;
+            transition: width 0.4s, background 0.4s;
+        }
+
+        /* ── Status badge ── */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .badge-normal {
+            background: #00ff9933;
+            color: #00ff99;
+        }
+
+        .badge-warning {
+            background: #ffaa0033;
+            color: #ffaa00;
+        }
+
+        .badge-danger {
+            background: #ff444433;
+            color: #ff4444;
+        }
+
+        /* ── Bin counters ── */
+        .bin-counters {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            margin-top: 6px;
+            width: 500px;
+        }
+
+        .bin-counter {
+            background: #0f3460;
+            border: 1px solid #1a4a80;
+            border-radius: 4px;
+            padding: 4px 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+        }
+
+        .bin-counter-label {
+            font-size: 0.65em;
+            color: #aaccee;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .bin-counter-value {
+            font-family: monospace;
+            font-size: 1em;
+            font-weight: bold;
+            color: rgba(80, 160, 255, 1);
+        }
+
+        .bin-counter.active {
+            border-color: rgba(80, 160, 255, 0.9);
+            background: #1a3a60;
+        }
+
+        /* ── Power chart ── */
+        .power-chart-section {
+            margin-top: 40px;
+        }
+
+        .power-chart-wrap {
+            position: relative;
+            background: #0d0d1a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 16px;
+        }
+
+        .power-chart-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .power-chart-subtitle {
+            font-size: 0.75em;
+            color: #666;
+            font-family: monospace;
+        }
+
+        .power-chart-stamp {
+            font-size: 0.75em;
+            color: #555;
+            font-family: monospace;
+        }
+
+        /* ── Gantry canvas ── */
+        #gantryCanvas {
+            display: block;
+            border: 1px solid #333;
+            border-radius: 6px;
+            background: #0d0d1a;
+        }
+
+        .gantry-label {
+            font-size: 0.75em;
+            color: #666;
+            margin-top: 6px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Hbot &mdash; Live Dashboard</h1>
+    <p class="timestamp" id="lastUpdate">Waiting for data&hellip;</p>
+
+    <div class="dashboard-layout">
+
+        <!-- ════════════════════════════════════════════════════════
+     LEFT PANEL — data tables
+     ════════════════════════════════════════════════════════ -->
+        <div class="left-panel">
+
+            <!-- (a) CELL STATUS -->
+            <h2>Cell Status</h2>
+            <table>
+                <tr>
+                    <th>Initialized</th>
+                    <td id="cellCellInit"><i>…</i></td>
+                </tr>
+                <tr>
+                    <th>Running</th>
+                    <td id="cellCellRunning"><i>…</i></td>
+                </tr>
+                <tr>
+                    <th>Paused</th>
+                    <td id="cellCellPaused"><i>…</i></td>
+                </tr>
+                <tr>
+                    <th>Safety Enable</th>
+                    <td id="cellCellSafety"><i>…</i></td>
+                </tr>
+                <tr>
+                    <th>Finished Parts</th>
+                    <td class="value" id="cellFinishedParts"><i>…</i></td>
+                </tr>
+            </table>
+
+            <!-- (b) HBOT STATUS -->
+            <h2>Hbot Status</h2>
+            <table>
+                <tr>
+                    <th>Initialized</th>
+                    <td id="cellInit"><i>…</i></td>
+                </tr>
+                <tr>
+                    <th>Running</th>
+                    <td id="cellRunning"><i>…</i></td>
+                </tr>
+                <tr>
+                    <th>Workspace Violation</th>
+                    <td id="cellWSV"><i>…</i></td>
+                </tr>
+                <tr>
+                    <th>Speed</th>
+                    <td id="cellSpeed"><i>…</i></td>
+                </tr>
+            </table>
+
+
+
+            <!-- (c) POSITION -->
+            <h2>HBot Position</h2>
+            <table>
+                <tr>
+                    <th>X Position</th>
+                    <td class="value" id="cellX"><i>…</i></td>
+                </tr>
+                <tr>
+                    <th>Y Position</th>
+                    <td class="value" id="cellY"><i>…</i></td>
+                </tr>
+                <tr>
+                    <th>Z Position</th>
+                    <td class="value" id="cellZ"><i>…</i></td>
+                </tr>
+            </table>
+
+            <!-- (d) TORQUE -->
+            <h2>HBot Torque</h2>
+            <table>
+                <tr>
+                    <th>X Torque</th>
+                    <td id="cellTorqueX"><i>…</i></td>
+                </tr>
+                <tr>
+                    <th>Y Torque</th>
+                    <td id="cellTorqueY"><i>…</i></td>
+                </tr>
+                <tr>
+                    <th>Z Torque</th>
+                    <td id="cellTorqueZ"><i>…</i></td>
+                </tr>
+            </table>
+
+            <!-- (e) REDLINE -->
+            <h2>HBot Motor Wear &amp; Redline</h2>
+
+            <!-- Threshold control -->
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+                <span style="font-size:0.82em;color:#aaccee;text-transform:uppercase;letter-spacing:1px;">Redline
+                    Torque Threshold</span>
+                <input type="range" id="redlineSlider" min="1" max="100" value="80"
+                    style="width:160px;accent-color:#00d4ff;cursor:pointer;">
+                <span id="redlineSliderLabel"
+                    style="font-family:monospace;color:#00d4ff;font-weight:bold;min-width:40px;">80%</span>
+                <span style="font-size:0.75em;color:#555;">% of historical max / min</span>
+            </div>
+            <div style="font-size:0.78em;color:#888;margin-bottom:8px;font-family:monospace;">
+                Window: <span id="redlineWindowInfo">—</span>
+            </div>
+
+            <table id="redlineTable">
+                <tr>
+                    <th style="width:12%">Axis</th>
+                    <th style="width:13%">Max</th>
+                    <th style="width:13%">Min</th>
+                    <th style="width:22%">Activity</th>
+                    <th style="width:10%">Redline %</th>
+                    <th style="width:13%">+ Limit</th>
+                    <th style="width:13%">&minus; Limit</th>
+                    <th style="width:10%">Status</th>
+                </tr>
+            </table>
+            <script>
+                (function () {
+                    var axes = ['X', 'Y', 'Z'];
+                    var tbl = document.getElementById("redlineTable");
+                    for (var i = 0; i < axes.length; i++) {
+                        var row = tbl.insertRow();
+                        var tdName = row.insertCell();
+                        tdName.style.cssText = "background:#16213e;color:#aaccee;font-size:0.9em;";
+                        tdName.textContent = axes[i] + " Axis";
+                        var tdMax = row.insertCell();
+                        tdMax.id = "cellRedlineMax" + i;
+                        tdMax.style.fontFamily = "monospace";
+                        tdMax.innerHTML = "<i>…</i>";
+                        var tdMin = row.insertCell();
+                        tdMin.id = "cellRedlineMin" + i;
+                        tdMin.style.fontFamily = "monospace";
+                        tdMin.innerHTML = "<i>…</i>";
+                        var tdBar = row.insertCell();
+                        tdBar.innerHTML = '<div class="redline-bg"><div class="redline-fill" id="redlineFill' + i + '" style="width:0%"></div></div>';
+                        var tdPct = row.insertCell();
+                        tdPct.id = "cellRedlinePct" + i;
+                        tdPct.style.fontFamily = "monospace";
+                        tdPct.innerHTML = "<i>…</i>";
+                        var tdPos = row.insertCell();
+                        tdPos.id = "cellRedlinePos" + i;
+                        tdPos.style.fontFamily = "monospace";
+                        tdPos.innerHTML = "<i>…</i>";
+                        var tdNeg = row.insertCell();
+                        tdNeg.id = "cellRedlineNeg" + i;
+                        tdNeg.style.fontFamily = "monospace";
+                        tdNeg.innerHTML = "<i>…</i>";
+                        var tdBadge = row.insertCell();
+                        tdBadge.id = "cellRedlineBadge" + i;
+                        tdBadge.innerHTML = "<i>…</i>";
+                    }
+                })();
+            </script>
+
+        </div><!-- /left-panel -->
+
+
+        <!-- ════════════════════════════════════════════════════════
+     RIGHT PANEL — X/Y gantry visualisation
+     ════════════════════════════════════════════════════════ -->
+        <div class="right-panel">
+            <h2 style="margin-top:0">X / Y Gantry Position</h2>
+            <canvas id="gantryCanvas" width="500" height="500"></canvas>
+            <div id="gantryPosDisplay" style="width:500px;margin-top:6px;background:#0d0d1a;border:1px solid #1e2a40;border-radius:4px;padding:5px 12px;display:flex;gap:24px;font-family:monospace;font-size:0.9em;">
+                <span style="color:#555;">Position:</span>
+                <span style="color:#00ff99;">X: <span id="gantryCurX">—</span></span>
+                <span style="color:#00ff99;">Y: <span id="gantryCurY">—</span></span>
+                <span style="color:#668;">Z: <span id="gantryCurZ">—</span></span>
+            </div>
+            <h2 style="margin-top:14px;margin-bottom:6px;">Bin Part Counts</h2>
+            <div class="bin-counters">
+                <div class="bin-counter" id="binCounter0">
+                    <span class="bin-counter-label">BIN 1 &nbsp;<span style="color:#555">(NW)</span></span>
+                    <span class="bin-counter-value" id="binCount0">0</span>
+                </div>
+                <div class="bin-counter" id="binCounter1">
+                    <span class="bin-counter-label">BIN 2 &nbsp;<span style="color:#555">(NE)</span></span>
+                    <span class="bin-counter-value" id="binCount1">0</span>
+                </div>
+                <div class="bin-counter" id="binCounter2">
+                    <span class="bin-counter-label">BIN 3 &nbsp;<span style="color:#555">(SW)</span></span>
+                    <span class="bin-counter-value" id="binCount2">0</span>
+                </div>
+                <div class="bin-counter" id="binCounter3">
+                    <span class="bin-counter-label">BIN 4 &nbsp;<span style="color:#555">(SE)</span></span>
+                    <span class="bin-counter-value" id="binCount3">0</span>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /dashboard-layout -->
+
+    <!-- ════════════════════════════════════════════════════════
+         POWER CONSUMPTION CHART
+         ════════════════════════════════════════════════════════ -->
+    <div class="power-chart-section">
+        <h2>Electrical Power Consumption</h2>
+        <div class="power-chart-wrap">
+            <div class="power-chart-meta">
+                <span class="power-chart-subtitle">Total power utilization (%) derived from motor torque load &mdash; 100 % = peak demand in window</span>
+                <span class="power-chart-stamp" id="powerChartStamp">&mdash;</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:14px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:0.82em;color:#aaccee;text-transform:uppercase;letter-spacing:1px;">Readings</span>
+                    <input type="range" id="powerRangeSlider" min="50" max="1000" step="50" value="1000"
+                        style="width:160px;accent-color:#ffcc32;cursor:pointer;">
+                    <span id="powerRangeLabel" style="font-family:monospace;color:#ffcc32;font-weight:bold;min-width:44px;">1000</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:0.82em;color:#aaccee;text-transform:uppercase;letter-spacing:1px;">Y&nbsp;Min&nbsp;%</span>
+                    <input type="number" id="powerYMin" min="0" max="99" value="0"
+                        style="width:60px;background:#0f3460;border:1px solid #333;color:#eee;padding:3px 6px;font-family:monospace;border-radius:3px;">
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:0.82em;color:#aaccee;text-transform:uppercase;letter-spacing:1px;">Y&nbsp;Max&nbsp;%</span>
+                    <input type="number" id="powerYMax" min="1" max="100" value="100"
+                        style="width:60px;background:#0f3460;border:1px solid #333;color:#eee;padding:3px 6px;font-family:monospace;border-radius:3px;">
+                </div>
+            </div>
+            <canvas id="powerChart" height="110"></canvas>
+        </div>
+    </div>
+
+</body>
+
+
+<!-- ════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ════════════════════════════════════════════════════════ -->
+<script>
+
+    const BASE = "http://localhost:4000";
+
+    // ── Gantry fixed workspace bounds (mm) ───────────────────────────────────────
+    const G_XMIN = -600, G_XMAX = 600;
+    const G_YMIN = -600, G_YMAX = 600;
+
+    /*
+     * niceStep(range)
+     * Returns a round grid interval for a given data range.
+     */
+    function niceStep(range) {
+        const rough = range / 5;
+        const pow = Math.pow(10, Math.floor(Math.log10(rough)));
+        const r = rough / pow;
+        return (r < 2 ? 1 : r < 5 ? 2 : 5) * pow;
+    }
+
+    /*
+     * toCanvas(x, y, canvas, pad)
+     * Converts world-space mm coordinates to canvas pixel coordinates.
+     * Y axis is flipped so that increasing Y goes upward on screen.
+     */
+    function toCanvas(x, y, canvas, pad) {
+        const w = canvas.width - pad * 2;
+        const h = canvas.height - pad * 2;
+        const px = pad + (x - G_XMIN) / (G_XMAX - G_XMIN) * w;
+        const py = canvas.height - pad - (y - G_YMIN) / (G_YMAX - G_YMIN) * h;
+        return { px, py };
+    }
+
+    /*
+     * drawGantry(x, y)
+     * Redraws the canvas with the current end-effector position.
+     */
+    function drawGantry(x, y) {
+        const canvas = document.getElementById("gantryCanvas");
+        const ctx = canvas.getContext("2d");
+        const W = canvas.width, H = canvas.height;
+        const PAD = 42;
+
+        ctx.fillStyle = "#0d0d1a";
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.strokeStyle = "#2a2a4a";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(PAD, PAD, W - PAD * 2, H - PAD * 2);
+
+        const xStep = niceStep(G_XMAX - G_XMIN);
+        const yStep = niceStep(G_YMAX - G_YMIN);
+
+        ctx.strokeStyle = "#1e1e3a";
+        ctx.lineWidth = 1;
+        ctx.font = "10px monospace";
+        ctx.fillStyle = "#555";
+
+        const xStart = Math.ceil(G_XMIN / xStep) * xStep;
+        for (let gx = xStart; gx <= G_XMAX; gx += xStep) {
+            const { px } = toCanvas(gx, G_YMIN, canvas, PAD);
+            ctx.beginPath(); ctx.moveTo(px, PAD); ctx.lineTo(px, H - PAD); ctx.stroke();
+            ctx.textAlign = "center";
+            ctx.fillText(gx.toFixed(0), px, H - PAD + 14);
+        }
+
+        const yStart = Math.ceil(G_YMIN / yStep) * yStep;
+        for (let gy = yStart; gy <= G_YMAX; gy += yStep) {
+            const { py } = toCanvas(G_XMIN, gy, canvas, PAD);
+            ctx.beginPath(); ctx.moveTo(PAD, py); ctx.lineTo(W - PAD, py); ctx.stroke();
+            ctx.textAlign = "right";
+            ctx.fillText(gy.toFixed(0), PAD - 5, py + 3);
+        }
+
+        // Corner bins — 300 mm wide, touching the conveyor edge (±400 mm in Y)
+        {
+            const BIN_W   = 300;  // mm in X
+            const CONV_Y  = 400;  // conveyor edge distance from centre
+            const BIN_GAP = 25;   // visual gap between bin and conveyor edge (mm)
+            // Bins span from workspace edge to just short of the conveyor side
+            const bins = [
+                { x: G_XMIN,         y: G_YMAX,           w: BIN_W, h: G_YMAX - (CONV_Y + BIN_GAP),           label: "BIN 1" },  // NW
+                { x: G_XMAX - BIN_W, y: G_YMAX,           w: BIN_W, h: G_YMAX - (CONV_Y + BIN_GAP),           label: "BIN 2" },  // NE
+                { x: G_XMIN,         y: -(CONV_Y + BIN_GAP), w: BIN_W, h: -(CONV_Y + BIN_GAP) - G_YMIN,       label: "BIN 3" },  // SW
+                { x: G_XMAX - BIN_W, y: -(CONV_Y + BIN_GAP), w: BIN_W, h: -(CONV_Y + BIN_GAP) - G_YMIN,       label: "BIN 4" },  // SE
+            ];
+            bins.forEach(function (b) {
+                const bTL = toCanvas(b.x,       b.y,       canvas, PAD);
+                const bBR = toCanvas(b.x + b.w, b.y - b.h, canvas, PAD);
+                const bW = bBR.px - bTL.px;
+                const bH = bBR.py - bTL.py;
+                ctx.fillStyle = "rgba(30, 80, 140, 0.45)";
+                ctx.fillRect(bTL.px, bTL.py, bW, bH);
+                ctx.strokeStyle = "rgba(80, 160, 255, 0.85)";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(bTL.px, bTL.py, bW, bH);
+                ctx.fillStyle = "rgba(120, 190, 255, 0.9)";
+                ctx.font = "bold 10px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText(b.label, bTL.px + bW / 2, bTL.py + bH / 2 + 4);
+            });
+        }
+
+        // Conveyor belt overlay — runs along Y centre of workspace
+        {
+            const cTL = toCanvas(G_XMIN, 400, canvas, PAD);
+            const cBR = toCanvas(G_XMAX, -400, canvas, PAD);
+            const cW = cBR.px - cTL.px;
+            const cH = cBR.py - cTL.py;
+            ctx.fillStyle = "rgba(60, 40, 20, 0.55)";
+            ctx.fillRect(cTL.px, cTL.py, cW, cH);
+            ctx.strokeStyle = "rgba(180, 120, 50, 0.7)";
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(cTL.px, cTL.py, cW, cH);
+            const stripeCount = 10;
+            ctx.strokeStyle = "rgba(180, 120, 50, 0.25)";
+            ctx.lineWidth = 1;
+            for (let s = 1; s < stripeCount; s++) {
+                const sy = cTL.py + (cH / stripeCount) * s;
+                ctx.beginPath(); ctx.moveTo(cTL.px + 2, sy); ctx.lineTo(cBR.px - 2, sy); ctx.stroke();
+            }
+            ctx.fillStyle = "rgba(200, 140, 60, 0.75)";
+            ctx.font = "9px monospace";
+            ctx.textAlign = "center";
+            ctx.fillText("CONV", (cTL.px + cBR.px) / 2, cTL.py - 4);
+        }
+
+        ctx.fillStyle = "#668";
+        ctx.font = "11px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("X: −600 – +600 mm", W / 2, H - 4);
+        ctx.save();
+        ctx.translate(12, H / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText("Y: −600 – +600 mm", 0, 0);
+        ctx.restore();
+
+        const cp = toCanvas(x, y, canvas, PAD);
+
+        ctx.strokeStyle = "rgba(0, 255, 153, 0.35)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(PAD, cp.py); ctx.lineTo(W - PAD, cp.py);
+        ctx.moveTo(cp.px, PAD); ctx.lineTo(cp.px, H - PAD);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const glow = ctx.createRadialGradient(cp.px, cp.py, 0, cp.px, cp.py, 18);
+        glow.addColorStop(0, "rgba(0, 255, 153, 0.45)");
+        glow.addColorStop(1, "rgba(0, 255, 153, 0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath(); ctx.arc(cp.px, cp.py, 18, 0, Math.PI * 2); ctx.fill();
+
+        ctx.fillStyle = "#00ff99";
+        ctx.beginPath(); ctx.arc(cp.px, cp.py, 5, 0, Math.PI * 2); ctx.fill();
+
+    }
+
+    function drawGantryError() {
+        const canvas = document.getElementById("gantryCanvas");
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#0d0d1a";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#555";
+        ctx.font = "14px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Position data unavailable", canvas.width / 2, canvas.height / 2);
+    }
+
+
+    // ── Fetch helpers ─────────────────────────────────────────────────────────────
+
+    async function getLatest(sensor, cols) {
+        let url = BASE + "/" + sensor + "/readings?latest=true";
+        if (cols) url += "&cols=" + cols;
+        const j = await $.getJSON(url);
+        return (j.data && j.data.length > 0) ? j.data[0] : null;
+    }
+
+    function setFlag(cellId, value, alertWhenOn) {
+        const cell = document.getElementById(cellId);
+        const on = (value === true || value === 1 || value === "true");
+        if (alertWhenOn) {
+            cell.innerHTML = on
+                ? '<span class="flag-alert">ACTIVE</span>'
+                : '<span class="flag-on">OK</span>';
+        } else {
+            cell.innerHTML = on
+                ? '<span class="flag-on">YES</span>'
+                : '<span class="flag-off">NO</span>';
+        }
+    }
+
+    function setSpeedBar(cellId, pct) {
+        const val = parseInt(pct, 10) || 0;
+        const colour = val > 90 ? "#ff4444" : val > 60 ? "#ffaa00" : "#00ff99";
+        document.getElementById(cellId).innerHTML =
+            '<div class="speed-bg"><div class="speed-fill" style="width:' + Math.min(val, 100) + '%;background:' + colour + '"></div></div>' +
+            '<span style="color:' + colour + ';font-weight:bold">' + val + '%</span>';
+    }
+
+    // Stores the latest redline data so torque cells can use live limits for colouring
+    let latestRedlineData = [];
+
+    /*
+     * formatDuration(ms)
+     * Converts a millisecond duration into a human-readable string.
+     * e.g. 3 661 000 ms → "1h 1m 1s"
+     *      45 000 ms     → "45s"
+     */
+    function formatDuration(ms) {
+        if (ms < 0 || isNaN(ms)) return "—";
+        const totalSec = Math.round(ms / 1000);
+        const h = Math.floor(totalSec / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        if (h > 0) return h + "h " + m + "m " + s + "s";
+        if (m > 0) return m + "m " + s + "s";
+        return s + "s";
+    }
+
+    function setRedlineRow(index, d) {
+        const pct = parseFloat(d.redlinePercent) || 0;
+        const fill = document.getElementById("redlineFill" + index);
+        fill.style.width = Math.min(pct, 100) + "%";
+        fill.style.background = pct < 10 ? "#00ff99" : pct < 25 ? "#ffaa00" : "#ff4444";
+
+        document.getElementById("cellRedlinePct" + index).textContent = pct.toFixed(1) + " %";
+        document.getElementById("cellRedlineBadge" + index).innerHTML =
+            '<span class="badge badge-' + d.status + '">' + d.status + '</span>';
+
+        document.getElementById("cellRedlineMax" + index).textContent =
+            parseFloat(d.maxEver).toFixed(3) + " Nm";
+        document.getElementById("cellRedlineMin" + index).textContent =
+            parseFloat(d.minEver).toFixed(3) + " Nm";
+
+        document.getElementById("cellRedlinePos" + index).textContent =
+            parseFloat(d.positiveLimit).toFixed(3) + " Nm";
+        document.getElementById("cellRedlineNeg" + index).textContent =
+            parseFloat(d.negativeLimit).toFixed(3) + " Nm";
+
+        // Window summary — only update once (from the first axis row)
+        if (index === 0) {
+            const span = d.latestTimestamp && d.oldestTimestamp
+                ? formatDuration(new Date(d.latestTimestamp) - new Date(d.oldestTimestamp))
+                : "—";
+            const summary = d.readingsAnalysed + " / " + d.windowRequested + " readings  ·  " + "Last : " + span;
+            const el = document.getElementById("redlineWindowInfo");
+            if (el) el.textContent = summary;
+        }
+    }
+
+    function torqueColour(value, axisIndex) {
+        // Use live redline limits when available; fall back to fixed thresholds
+        const d = latestRedlineData[axisIndex];
+        if (d) {
+            if (value >= d.positiveLimit || value <= d.negativeLimit) return "#ff4444"; // redline
+            const warnPos = d.positiveLimit * 0.75;
+            const warnNeg = d.negativeLimit * 0.75;
+            if (value >= warnPos || value <= warnNeg) return "#ffaa00"; // warning
+            return "#00ff99";
+        }
+        // Fallback if redline data not yet loaded
+        const abs = Math.abs(value);
+        return abs > 50 ? "#ff4444" : abs > 25 ? "#ffaa00" : "#00ff99";
+    }
+
+
+    // ── Bin part counters ─────────────────────────────────────────────────────────
+    // Counts are session-only (reset on page load).
+    // A part is counted once each time the end-effector ENTERS a bin zone —
+    // continuous presence does not keep incrementing.
+
+    const BIN_W_MM   = 300;   // must match BIN_W in drawGantry
+    const CONV_Y_MM  = 400;  // must match CONV_Y in drawGantry
+
+    // World-space bounds for each bin [xMin, xMax, yMin, yMax]
+    const BIN_BOUNDS = [
+        [G_XMIN,            G_XMIN + BIN_W_MM,  CONV_Y_MM,   G_YMAX],  // BIN 1 NW
+        [G_XMAX - BIN_W_MM, G_XMAX,             CONV_Y_MM,   G_YMAX],  // BIN 2 NE
+        [G_XMIN,            G_XMIN + BIN_W_MM,  G_YMIN,     -CONV_Y_MM],  // BIN 3 SW
+        [G_XMAX - BIN_W_MM, G_XMAX,             G_YMIN,     -CONV_Y_MM],  // BIN 4 SE
+    ];
+
+    const binCounts  = [0, 0, 0, 0];
+    let   prevBinIdx = -1;   // -1 = gantry was not in any bin last poll
+
+    function getBinIndex(x, y) {
+        for (let i = 0; i < BIN_BOUNDS.length; i++) {
+            const b = BIN_BOUNDS[i];
+            if (x >= b[0] && x <= b[1] && y >= b[2] && y <= b[3]) return i;
+        }
+        return -1;
+    }
+
+    function updateBinCounters(x, y) {
+        const idx = getBinIndex(x, y);
+
+        // Clear active highlight on all bins
+        for (let i = 0; i < 4; i++) {
+            document.getElementById("binCounter" + i).classList.toggle("active", i === idx);
+        }
+
+        // Only increment on entry (transition from outside or from a different bin)
+        if (idx !== -1 && idx !== prevBinIdx) {
+            binCounts[idx]++;
+            document.getElementById("binCount" + idx).textContent = binCounts[idx];
+        }
+
+        prevBinIdx = idx;
+    }
+
+    // ── Main update loop ──────────────────────────────────────────────────────────
+
+    async function updateDashboard() {
+
+        // ── (a) Hbot Status ───────────────────────────────────────────────────────
+        try {
+            const s = await getLatest("hbot-status", null);
+            if (s) {
+                setFlag("cellInit", s.initialized, false);
+                setFlag("cellRunning", s.running, false);
+                setFlag("cellWSV", s.ws_violation, true);
+                setSpeedBar("cellSpeed", s.speed_pct);
+            }
+        } catch (e) {
+            ["cellInit", "cellRunning", "cellWSV", "cellSpeed"]
+                .forEach(function (id) { document.getElementById(id).textContent = "err"; });
+        }
+
+        // ── (b) Cell Status ───────────────────────────────────────────────────────
+        try {
+            const c = await getLatest("cell-status", null);
+            if (c) {
+                setFlag("cellCellInit", c.initialized, false);
+                setFlag("cellCellRunning", c.running, false);
+
+                const isPaused = (c.paused === true || c.paused === 1);
+                document.getElementById("cellCellPaused").innerHTML = isPaused
+                    ? '<span class="flag-warn">PAUSED</span>'
+                    : '<span class="flag-on">RUNNING</span>';
+
+                setFlag("cellCellSafety", c.safety_enable, false);
+
+                const fp = parseInt(c.finished_part_num, 10);
+                document.getElementById("cellFinishedParts").textContent =
+                    isNaN(fp) ? "—" : fp.toLocaleString();
+            }
+        } catch (e) {
+            ["cellCellInit", "cellCellRunning", "cellCellPaused", "cellCellSafety", "cellCellSpeed", "cellFinishedParts"]
+                .forEach(function (id) { document.getElementById(id).textContent = "err"; });
+        }
+
+        // ── (c) Position + gantry ─────────────────────────────────────────────────
+        try {
+            const pos = await getLatest("hbot-position", null);
+            if (pos) {
+                const x = parseFloat(pos.x_pos);
+                const y = parseFloat(pos.y_pos);
+                const z = parseFloat(pos.z_pos);
+
+                document.getElementById("cellX").textContent = isFinite(x) ? x.toFixed(3) + " mm" : "—";
+                document.getElementById("cellY").textContent = isFinite(y) ? y.toFixed(3) + " mm" : "—";
+                document.getElementById("cellZ").textContent = isFinite(z) ? z.toFixed(3) + " mm" : "—";
+
+                if (isFinite(x) && isFinite(y)) {
+                    document.getElementById("gantryCurX").textContent = x.toFixed(2) + " mm";
+                    document.getElementById("gantryCurY").textContent = y.toFixed(2) + " mm";
+                    document.getElementById("gantryCurZ").textContent = isFinite(z) ? z.toFixed(2) + " mm" : "—";
+                    drawGantry(x, y);
+                    updateBinCounters(x, y);
+                } else {
+                    document.getElementById("gantryCurX").textContent = "—";
+                    document.getElementById("gantryCurY").textContent = "—";
+                    document.getElementById("gantryCurZ").textContent = "—";
+                    drawGantryError();
+                }
+            } else {
+                ["cellX", "cellY", "cellZ"].forEach(function (id) { document.getElementById(id).textContent = "—"; });
+                ["gantryCurX", "gantryCurY", "gantryCurZ"].forEach(function (id) { document.getElementById(id).textContent = "—"; });
+                drawGantryError();
+            }
+        } catch (e) {
+            ["cellX", "cellY", "cellZ"].forEach(function (id) { document.getElementById(id).textContent = "err"; });
+            ["gantryCurX", "gantryCurY", "gantryCurZ"].forEach(function (id) { document.getElementById(id).textContent = "err"; });
+            drawGantryError();
+        }
+
+        // ── (d) Torque ────────────────────────────────────────────────────────────
+        try {
+            const t = await getLatest("hbot-torque", null);
+            const axes = [
+                { id: "cellTorqueX", key: "x_torque", idx: 0 },
+                { id: "cellTorqueY", key: "y_torque", idx: 1 },
+                { id: "cellTorqueZ", key: "z_torque", idx: 2 },
+            ];
+            axes.forEach(function (a) {
+                const cell = document.getElementById(a.id);
+                if (t && t[a.key] !== undefined) {
+                    const val = parseFloat(t[a.key]);
+                    const colour = torqueColour(val, a.idx);
+                    cell.innerHTML = '<span style="color:' + colour + ';font-weight:bold">' + val.toFixed(3) + " Nm</span>";
+                } else {
+                    cell.textContent = "—";
+                }
+            });
+        } catch (e) {
+            ["cellTorqueX", "cellTorqueY", "cellTorqueZ"]
+                .forEach(function (id) { document.getElementById(id).textContent = "err"; });
+        }
+
+        // ── (e) Redline ───────────────────────────────────────────────────────────
+        try {
+            const threshold = document.getElementById("redlineSlider").value;
+            const j = await $.getJSON(BASE + "/hbot-torque/redline?threshold=" + threshold);
+            const items = Array.isArray(j.data) ? j.data : [j.data];
+            latestRedlineData = items;
+            for (let i = 0; i < items.length; i++) setRedlineRow(i, items[i]);
+        } catch (e) {
+            for (let i = 0; i < 3; i++) {
+                document.getElementById("cellRedlinePct" + i).textContent = "err";
+                document.getElementById("cellRedlineBadge" + i).textContent = "err";
+            }
+        }
+
+        // ── Timestamp ─────────────────────────────────────────────────────────────
+        document.getElementById("lastUpdate").textContent =
+            "Last updated: " + new Date().toLocaleTimeString();
+    }
+
+    // ── Threshold slider ──────────────────────────────────────────────────────────
+    // Re-fetches only the redline section immediately when the user moves the slider;
+    // the full poll loop picks it up on the next tick anyway.
+    let sliderDebounce = null;
+    document.getElementById("redlineSlider").addEventListener("input", function () {
+        document.getElementById("redlineSliderLabel").textContent = this.value + "%";
+        clearTimeout(sliderDebounce);
+        sliderDebounce = setTimeout(async function () {
+            try {
+                const threshold = document.getElementById("redlineSlider").value;
+                const j = await $.getJSON(BASE + "/hbot-torque/redline?threshold=" + threshold);
+                const items = Array.isArray(j.data) ? j.data : [j.data];
+                latestRedlineData = items;
+                for (let i = 0; i < items.length; i++) setRedlineRow(i, items[i]);
+            } catch (e) { /* handled on next full poll */ }
+        }, 200);
+    });
+
+    updateDashboard();
+    setInterval(updateDashboard, 500);
+
+    // ── Power consumption chart ───────────────────────────────────────────────────
+    // Electrical power is proportional to torque at any given operating point.
+    // Total load = |x_torque| + |y_torque| + |z_torque| per row.
+    // This is normalised to 0–100 % where 100 % = peak total load in the fetched window,
+    // giving a meaningful power utilisation curve.  Per-axis contributions are shown
+    // as secondary lines so the source of load spikes is visible.
+
+    let powerChartInstance = null;
+
+    function buildPowerChart(labels, totalPct, xPct, yPct, zPct, peakNm) {
+        const ctx = document.getElementById("powerChart").getContext("2d");
+
+        const datasets = [
+            {
+                label: "Total Power Utilization (%)",
+                data: totalPct,
+                borderColor: "rgba(255, 200, 50, 1)",
+                backgroundColor: "rgba(255, 200, 50, 0.10)",
+                borderWidth: 2,
+                pointRadius: 0,
+                fill: true,
+                tension: 0.3,
+                yAxisID: "yPct",
+                order: 1,
+            },
+            {
+                label: "X Motor (%)",
+                data: xPct,
+                borderColor: "rgba(0, 212, 255, 0.7)",
+                backgroundColor: "transparent",
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                tension: 0.3,
+                yAxisID: "yPct",
+                order: 2,
+            },
+            {
+                label: "Y Motor (%)",
+                data: yPct,
+                borderColor: "rgba(0, 255, 153, 0.7)",
+                backgroundColor: "transparent",
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                tension: 0.3,
+                yAxisID: "yPct",
+                order: 3,
+            },
+            {
+                label: "Z Motor (%)",
+                data: zPct,
+                borderColor: "rgba(200, 100, 255, 0.7)",
+                backgroundColor: "transparent",
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                tension: 0.3,
+                yAxisID: "yPct",
+                order: 4,
+            },
+        ];
+
+        if (powerChartInstance) {
+            powerChartInstance.data.labels = labels;
+            datasets.forEach(function (ds, i) {
+                powerChartInstance.data.datasets[i].data = ds.data;
+            });
+            powerChartInstance.options.plugins.subtitle.text =
+                "Peak in window: " + peakNm.toFixed(2) + " Nm total torque = 100 %";
+            powerChartInstance.update("none");
+            return;
+        }
+
+        powerChartInstance = new Chart(ctx, {
+            type: "line",
+            data: { labels, datasets },
+            options: {
+                animation: false,
+                responsive: true,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: {
+                        labels: { color: "#aaa", font: { size: 11 }, boxWidth: 16 }
+                    },
+                    subtitle: {
+                        display: true,
+                        text: "Peak in window: " + peakNm.toFixed(2) + " Nm total torque = 100 %",
+                        color: "#555",
+                        font: { size: 10, style: "italic" },
+                        padding: { bottom: 8 },
+                    },
+                    tooltip: {
+                        backgroundColor: "rgba(13,13,26,0.92)",
+                        titleColor: "#00d4ff",
+                        bodyColor: "#ddd",
+                        callbacks: {
+                            label: function (item) {
+                                return " " + item.dataset.label + ": " + item.parsed.y.toFixed(1) + " %";
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: "#666",
+                            font: { size: 10 },
+                            maxTicksLimit: 12,
+                            maxRotation: 0,
+                        },
+                        grid: { color: "#1e1e3a" },
+                    },
+                    yPct: {
+                        min: 0,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: "Power Utilization (%)",
+                            color: "#668",
+                            font: { size: 11 },
+                        },
+                        ticks: {
+                            color: "#666",
+                            font: { size: 10 },
+                            callback: function (v) { return v + "%"; }
+                        },
+                        grid: { color: "#1e1e3a" },
+                    }
+                }
+            }
+        });
+    }
+
+    async function updatePowerChart() {
+        const last = parseInt(document.getElementById("powerRangeSlider").value, 10) || 1000;
+        try {
+            const j = await $.getJSON(
+                BASE + "/hbot-torque/readings?last=" + last + "&dir=asc&cols=x_torque,y_torque,z_torque"
+            );
+            const rows = j.data || [];
+            if (rows.length === 0) return;
+
+            const labels = rows.map(function (r) {
+                return new Date(r.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            });
+
+            const xAbs = rows.map(function (r) { return Math.abs(parseFloat(r.x_torque) || 0); });
+            const yAbs = rows.map(function (r) { return Math.abs(parseFloat(r.y_torque) || 0); });
+            const zAbs = rows.map(function (r) { return Math.abs(parseFloat(r.z_torque) || 0); });
+            const totalAbs = rows.map(function (r, i) { return xAbs[i] + yAbs[i] + zAbs[i]; });
+
+            // Normalise against peak total load in this window
+            const peakNm = Math.max.apply(null, totalAbs) || 1;
+            const norm = function (v) { return parseFloat(((v / peakNm) * 100).toFixed(2)); };
+
+            const totalPct = totalAbs.map(norm);
+            const xPct     = xAbs.map(norm);
+            const yPct     = yAbs.map(norm);
+            const zPct     = zAbs.map(norm);
+
+            buildPowerChart(labels, totalPct, xPct, yPct, zPct, peakNm);
+
+            document.getElementById("powerChartStamp").textContent =
+                rows.length + " readings  ·  updated " + new Date().toLocaleTimeString();
+        } catch (e) {
+            document.getElementById("powerChartStamp").textContent = "fetch error";
+        }
+    }
+
+    updatePowerChart();
+    setInterval(updatePowerChart, 5000);
+
+    // ── Power chart controls ──────────────────────────────────────────────────────
+    let powerRangeDebounce = null;
+    document.getElementById("powerRangeSlider").addEventListener("input", function () {
+        document.getElementById("powerRangeLabel").textContent = this.value;
+        clearTimeout(powerRangeDebounce);
+        powerRangeDebounce = setTimeout(updatePowerChart, 250);
+    });
+
+    function applyPowerYScale() {
+        if (!powerChartInstance) return;
+        const yMin = parseFloat(document.getElementById("powerYMin").value);
+        const yMax = parseFloat(document.getElementById("powerYMax").value);
+        if (isNaN(yMin) || isNaN(yMax) || yMin >= yMax) return;
+        powerChartInstance.options.scales.yPct.min = yMin;
+        powerChartInstance.options.scales.yPct.max = yMax;
+        powerChartInstance.update("none");
+    }
+
+    document.getElementById("powerYMin").addEventListener("change", applyPowerYScale);
+    document.getElementById("powerYMax").addEventListener("change", applyPowerYScale);
+
+</script>
+
+</html>

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Hbot Robot Telemetry API Explorer</title>
+  <script src="jquery-4.0.0.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; padding: 24px; }
+    h1 { color: #1f497d; font-size: 1.5rem; margin-bottom: 4px; }
+    .subtitle { color: #666; font-size: 0.9rem; margin-bottom: 24px; }
+    .card { background: #fff; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.10); }
+    .card h2 { font-size: 1rem; color: #2e75b6; margin-bottom: 14px;
+               border-bottom: 1px solid #e0e8f0; padding-bottom: 8px; }
+    .section-label { font-size: 0.78rem; font-weight: bold; color: #888; text-transform: uppercase;
+                     letter-spacing: .8px; margin: 14px 0 8px; }
+    .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-bottom: 14px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 0.82rem; font-weight: bold; color: #444; }
+    input[type="text"], input[type="number"], input[type="datetime-local"], select {
+      padding: 7px 10px; border: 1px solid #ccc; border-radius: 5px;
+      font-size: 0.9rem; background: #fafafa; }
+    input[type="text"]          { width: 280px; }
+    input[type="number"]        { width: 100px; }
+    input[type="datetime-local"]{ width: 210px; }
+    select                      { width: 200px; }
+    .select-narrow              { width: 130px !important; }
+
+    /* Mode toggle */
+    .mode-toggle { display: flex; border-radius: 6px; overflow: hidden; border: 1px solid #2e75b6; width: fit-content; }
+    .mode-toggle button { padding: 7px 22px; border: none; background: #fff; color: #2e75b6;
+                          font-size: 0.9rem; cursor: pointer; font-weight: bold; }
+    .mode-toggle button.active { background: #2e75b6; color: #fff; }
+
+    /* Column chips */
+    #colCheckboxes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .col-chip { display: flex; align-items: center; gap: 5px; background: #eef4fb;
+                border: 1px solid #b0cceb; border-radius: 20px; padding: 4px 12px;
+                font-size: 0.85rem; cursor: pointer; user-select: none; }
+    .col-chip input[type="checkbox"] { cursor: pointer; }
+    .col-chip.checked { background: #2e75b6; color: #fff; border-color: #2e75b6; }
+
+    /* Value condition builder */
+    #valueCondBlock { background: #f7faff; border: 1px solid #d0e4f7; border-radius: 6px;
+                      padding: 14px 16px; margin-top: 4px; }
+    #valueCondBlock .hint { font-size: 0.78rem; color: #888; margin-top: 6px; }
+
+    /* Query preview */
+    .query-preview { background: #1e1e1e; color: #9cdcfe; font-family: 'Courier New', monospace;
+                     font-size: 0.88rem; padding: 12px 16px; border-radius: 6px;
+                     word-break: break-all; line-height: 1.5; }
+    .query-preview .method    { color: #569cd6; font-weight: bold; }
+    .query-preview .url-base  { color: #ce9178; }
+    .query-preview .url-path  { color: #4ec9b0; }
+    .query-preview .url-params{ color: #dcdcaa; }
+
+    #sendBtn { background: #1f497d; color: #fff; border: none; padding: 10px 28px;
+               border-radius: 6px; font-size: 0.95rem; font-weight: bold; cursor: pointer; margin-top: 8px; }
+    #sendBtn:hover    { background: #2e75b6; }
+    #sendBtn:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* Results */
+    #resultsTable { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    #resultsTable th { background: #1f497d; color: #fff; padding: 8px 12px; text-align: left; }
+    #resultsTable td { padding: 7px 12px; border-bottom: 1px solid #e8edf2; }
+    #resultsTable tr:nth-child(even) td { background: #f4f8fd; }
+    #resultsTable tr:hover td { background: #e8f0fb; }
+
+    #rawJson { background: #1e1e1e; color: #d4d4d4; font-family: 'Courier New', monospace;
+               font-size: 0.82rem; padding: 14px 16px; border-radius: 6px; max-height: 300px;
+               overflow-y: auto; white-space: pre; margin-top: 14px; }
+
+    .status-bar { font-size: 0.85rem; color: #555; margin-bottom: 10px; }
+    .status-bar .ok  { color: #2a7a2a; font-weight: bold; }
+    .status-bar .err { color: #c0392b; font-weight: bold; }
+    .loading { color: #888; font-style: italic; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; }
+    .badge-normal  { background: #d4edda; color: #155724; }
+    .badge-warning { background: #fff3cd; color: #856404; }
+    .badge-danger  { background: #f8d7da; color: #721c24; }
+    .retry-btn { font-size: 0.8rem; color: #2e75b6; cursor: pointer; border: none;
+                 background: none; text-decoration: underline; margin-left: 8px; padding: 0; }
+  </style>
+</head>
+<body>
+
+<h1>Hbot &mdash; Robot Telemetry API Explorer</h1>
+<p class="subtitle">Query the Hbot database without writing any code.</p>
+
+<!-- ── Configuration ── -->
+<div class="card">
+  <h2>Configuration</h2>
+  <div class="row">
+    <div class="field">
+      <label for="serverUrl">Server URL</label>
+      <input type="text" id="serverUrl" value="http://localhost:4000">
+    </div>
+  </div>
+</div>
+
+<!-- ── Query Builder ── -->
+<div class="card">
+  <h2>Query Builder</h2>
+
+  <!-- Row 1: mode / sensor / agg fn / limit -->
+  <div class="row">
+    <div class="field">
+      <label>Mode</label>
+      <div class="mode-toggle">
+        <button id="modeFilter"    class="active" onclick="setMode('filter')">Filter</button>
+        <button id="modeAggregate"              onclick="setMode('aggregate')">Aggregate</button>
+        <button id="modeRedline"                onclick="setMode('redline')">Redline</button>
+      </div>
+    </div>
+
+    <div class="field" id="sensorField">
+      <label for="sensorSelect">Sensor / Table</label>
+      <select id="sensorSelect" onchange="onSensorChange()">
+        <option value="hbot-position">Hbot_Position</option>
+        <option value="hbot-status">Hbot_Status</option>
+        <option value="hbot-torque">Hbot_Torque</option>
+        <option value="cell-status">Cell_Status</option>
+      </select>
+    </div>
+
+    <div class="field" id="fnField" style="display:none">
+      <label for="fnSelect">Function</label>
+      <select id="fnSelect" onchange="updatePreview()">
+        <option value="avg">avg</option>
+        <option value="min">min</option>
+        <option value="max">max</option>
+        <option value="count">count</option>
+        <option value="sum">sum</option>
+      </select>
+    </div>
+
+    <div class="field" id="lastField">
+      <label for="lastInput">Last (rows)</label>
+      <input type="number" id="lastInput" value="10" min="1" max="10000" oninput="updatePreview()">
+    </div>
+
+    <div class="field" id="orderField">
+      <label for="orderSelect">Order by</label>
+      <select id="orderSelect" onchange="updatePreview()">
+        <option value="timestamp_desc">Timestamp — newest first</option>
+        <option value="timestamp_asc">Timestamp — oldest first</option>
+      </select>
+    </div>
+
+    <div class="field" id="thresholdField" style="display:none">
+      <label for="thresholdInput">Redline % of peak</label>
+      <input type="number" id="thresholdInput" value="80" min="1" max="100" oninput="updatePreview()">
+    </div>
+
+    <div class="field" id="redlineLastField" style="display:none">
+      <label for="redlineLastInput">Readings to analyse</label>
+      <input type="number" id="redlineLastInput" value="1000" min="1" max="1000" oninput="updatePreview()">
+    </div>
+  </div>
+
+  <!-- Column selector -->
+  <div class="section-label" id="colLabel">
+    Columns <span style="font-weight:normal;color:#888;text-transform:none;letter-spacing:0">(select one or more; leave all unchecked for all columns)</span>
+  </div>
+  <div id="colCheckboxes"></div>
+
+  <!-- Timestamp range -->
+  <div class="section-label" style="margin-top:18px">Time Range</div>
+  <div class="row">
+    <div class="field">
+      <label for="fromInput">From</label>
+      <input type="datetime-local" id="fromInput" oninput="updatePreview()" step="1">
+    </div>
+    <div class="field">
+      <label for="toInput">To</label>
+      <input type="datetime-local" id="toInput" oninput="updatePreview()" step="1">
+    </div>
+  </div>
+
+  <!-- Value condition builder (filter mode only) -->
+  <div id="valueCondSection">
+    <div class="section-label">Value Filter
+      <span style="font-weight:normal;color:#888;text-transform:none;letter-spacing:0">(optional — filter rows by a column value)</span>
+    </div>
+    <div id="valueCondBlock">
+      <div class="row">
+        <div class="field">
+          <label for="valColSelect">Column</label>
+          <select id="valColSelect" class="select-narrow" onchange="updatePreview()">
+            <option value="">— none —</option>
+          </select>
+        </div>
+
+        <div class="field" id="valOpField" style="display:none">
+          <label for="valOpSelect">Condition</label>
+          <select id="valOpSelect" class="select-narrow" onchange="onValOpChange()">
+            <option value="none">None</option>
+            <option value="eq">=  equals</option>
+            <option value="neq">≠  not equals</option>
+            <option value="gt">&gt;  greater than</option>
+            <option value="gte">&ge;  at least</option>
+            <option value="lt">&lt;  less than</option>
+            <option value="lte">&le;  at most</option>
+            <option value="between">between</option>
+          </select>
+        </div>
+
+        <!-- Single value input -->
+        <div class="field" id="valSingleField" style="display:none">
+          <label for="valSingleInput">Value</label>
+          <input type="number" id="valSingleInput" step="any" oninput="updatePreview()">
+        </div>
+
+        <!-- Between inputs -->
+        <div class="field" id="valMinField" style="display:none">
+          <label for="valMinInput">Min value</label>
+          <input type="number" id="valMinInput" step="any" oninput="updatePreview()">
+        </div>
+        <div class="field" id="valMaxField" style="display:none">
+          <label for="valMaxInput">Max value</label>
+          <input type="number" id="valMaxInput" step="any" oninput="updatePreview()">
+        </div>
+      </div>
+      <div class="hint" id="valHint"></div>
+    </div>
+  </div>
+
+</div><!-- /card Query Builder -->
+
+<!-- ── Query String ── -->
+<div class="card">
+  <h2>Query String</h2>
+  <div class="query-preview" id="queryPreview"></div>
+  <br>
+  <button id="sendBtn" onclick="sendRequest()">Send Request</button>
+</div>
+
+<!-- ── Results ── -->
+<div class="card" id="resultsCard" style="display:none">
+  <h2>Results</h2>
+  <div class="status-bar" id="statusBar"></div>
+  <div id="tableContainer"></div>
+  <div id="rawJson"></div>
+</div>
+
+
+<script>
+  // ── Data ──────────────────────────────────────────────────────────────────────
+
+  // All columns for each sensor (same as TABLE_COLUMNS on the server)
+  const SENSOR_COLS = {
+    'hbot-position': ['x_pos', 'y_pos', 'z_pos'],
+    'hbot-status':   ['initialized', 'running', 'ws_violation', 'speed_pct'],
+    'hbot-torque':   ['x_torque', 'y_torque', 'z_torque'],
+    'cell-status':   ['initialized', 'running', 'speed_pct', 'finished_part_num', 'safety_enable', 'paused'],
+  };
+
+  // Human-readable labels for columns
+  const COL_LABELS = {
+    x_pos:             'X Position (mm)',
+    y_pos:             'Y Position (mm)',
+    z_pos:             'Z Position (mm)',
+    x_torque:          'X Torque (Nm)',
+    y_torque:          'Y Torque (Nm)',
+    z_torque:          'Z Torque (Nm)',
+    initialized:       'Initialized',
+    running:           'Running',
+    ws_violation:      'Workspace Violation',
+    speed_pct:         'Speed %',
+    finished_part_num: 'Finished Parts',
+    safety_enable:     'Safety Enable',
+    paused:            'Paused',
+  };
+
+  const REDLINE_AXES = ['x_torque', 'y_torque', 'z_torque'];
+
+  let currentMode    = 'filter';
+  let currentCols    = [];   // all cols for current sensor
+  let selectedCols   = [];   // cols checked by user
+
+  function colLabel(c) { return COL_LABELS[c] ?? c; }
+
+  function currentSensor() {
+    return document.getElementById('sensorSelect').value;
+  }
+
+  // ── Column chips ──────────────────────────────────────────────────────────────
+
+  function renderColChips() {
+    const box  = document.getElementById('colCheckboxes');
+    box.innerHTML = '';
+    currentCols.forEach(function(c) {
+      const checked = selectedCols.includes(c);
+      const chip    = document.createElement('label');
+      chip.className = 'col-chip' + (checked ? ' checked' : '');
+      chip.innerHTML = `<input type="checkbox" value="${c}" ${checked ? 'checked' : ''}> ${colLabel(c)}`;
+      chip.querySelector('input').addEventListener('change', function(e) {
+        onColToggle(c, e.target.checked, chip);
+      });
+      box.appendChild(chip);
+    });
+    // Refresh val-col select
+    refreshValColSelect();
+  }
+
+  function onColToggle(col, checked, chip) {
+    // In aggregate/redline mode, only one col at a time
+    if (currentMode === 'aggregate' || currentMode === 'redline') {
+      selectedCols = checked ? [col] : [];
+      document.querySelectorAll('.col-chip').forEach(function(c) {
+        const inp = c.querySelector('input');
+        const isThis = inp.value === col;
+        inp.checked = isThis && checked;
+        c.classList.toggle('checked', isThis && checked);
+      });
+    } else {
+      if (checked) selectedCols.push(col);
+      else         selectedCols = selectedCols.filter(function(m) { return m !== col; });
+      chip.classList.toggle('checked', checked);
+    }
+    updatePreview();
+  }
+
+  function onSensorChange() {
+    const s     = currentSensor();
+    currentCols = SENSOR_COLS[s] || [];
+    selectedCols = [];
+    renderColChips();
+    updatePreview();
+  }
+
+  function refreshValColSelect() {
+    const sel = document.getElementById('valColSelect');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— none —</option>';
+    currentCols.forEach(function(c) {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = colLabel(c);
+      if (c === prev) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    // Show/hide op selector based on whether a col is picked
+    document.getElementById('valOpField').style.display = sel.value ? '' : 'none';
+    updatePreview();
+  }
+
+  // ── Mode switching ────────────────────────────────────────────────────────────
+
+  function setMode(mode) {
+    currentMode = mode;
+    document.getElementById('modeFilter'   ).classList.toggle('active', mode === 'filter');
+    document.getElementById('modeAggregate').classList.toggle('active', mode === 'aggregate');
+    document.getElementById('modeRedline'  ).classList.toggle('active', mode === 'redline');
+
+    document.getElementById('fnField'         ).style.display = mode === 'aggregate' ? '' : 'none';
+    document.getElementById('lastField'       ).style.display = mode === 'filter'    ? '' : 'none';
+    document.getElementById('orderField'      ).style.display = mode === 'filter'    ? '' : 'none';
+    document.getElementById('thresholdField'  ).style.display = mode === 'redline'   ? '' : 'none';
+    document.getElementById('redlineLastField').style.display = mode === 'redline'   ? '' : 'none';
+    document.getElementById('sensorField'     ).style.display = mode === 'redline'   ? 'none' : '';
+    document.getElementById('valueCondSection').style.display = mode === 'filter'    ? '' : 'none';
+
+    const colLabel_ = document.getElementById('colLabel');
+    if (mode === 'redline') {
+      colLabel_.innerHTML = 'Torque axis <span style="font-weight:normal;color:#888;text-transform:none;letter-spacing:0">(select one, or none for all three)</span>';
+      currentCols  = REDLINE_AXES;
+      selectedCols = [];
+      renderColChips();
+    } else {
+      colLabel_.innerHTML = mode === 'aggregate'
+        ? 'Column <span style="font-weight:normal;color:#888;text-transform:none;letter-spacing:0">(select one — required)</span>'
+        : 'Columns <span style="font-weight:normal;color:#888;text-transform:none;letter-spacing:0">(select one or more; leave all unchecked for all columns)</span>';
+      if (mode === 'aggregate' && selectedCols.length > 1) {
+        selectedCols = [selectedCols[0]];
+        renderColChips();
+      } else {
+        onSensorChange();
+      }
+    }
+    updatePreview();
+  }
+
+  // ── Value condition builder ───────────────────────────────────────────────────
+
+  document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('valColSelect').addEventListener('change', function() {
+      document.getElementById('valOpField').style.display = this.value ? '' : 'none';
+      if (!this.value) {
+        document.getElementById('valSingleField').style.display = 'none';
+        document.getElementById('valMinField').style.display    = 'none';
+        document.getElementById('valMaxField').style.display    = 'none';
+      }
+      updatePreview();
+    });
+  });
+
+  function onValOpChange() {
+    const op = document.getElementById('valOpSelect').value;
+    document.getElementById('valSingleField').style.display =
+      ['eq','neq','gt','gte','lt','lte'].includes(op) ? '' : 'none';
+    document.getElementById('valMinField').style.display = op === 'between' ? '' : 'none';
+    document.getElementById('valMaxField').style.display = op === 'between' ? '' : 'none';
+
+    const hints = {
+      none:    '',
+      eq:      'Adds ?val-eq=N — returns only rows where the column exactly equals N.',
+      neq:     'Adds ?val-neq=N — excludes rows where the column equals N.',
+      gt:      'Adds ?val-gt=N — returns rows where the column is strictly greater than N.',
+      gte:     'Adds ?val-min=N — returns rows where the column is >= N.',
+      lt:      'Adds ?val-lt=N — returns rows where the column is strictly less than N.',
+      lte:     'Adds ?val-max=N — returns rows where the column is <= N.',
+      between: 'Adds ?val-min=N&val-max=M — returns rows where the column is between N and M (inclusive).',
+    };
+    document.getElementById('valHint').textContent = hints[op] || '';
+    updatePreview();
+  }
+
+  function getValueParams(params) {
+    const valCol = document.getElementById('valColSelect').value;
+    const op     = document.getElementById('valOpSelect').value;
+    if (!valCol || op === 'none') return;
+
+    const single = parseFloat(document.getElementById('valSingleInput').value);
+    const vmin   = parseFloat(document.getElementById('valMinInput').value);
+    const vmax   = parseFloat(document.getElementById('valMaxInput').value);
+
+    params.set('val-col', valCol);
+    if (op === 'eq'      && !isNaN(single)) params.set('val-eq',  single);
+    if (op === 'neq'     && !isNaN(single)) params.set('val-neq', single);
+    if (op === 'gt'      && !isNaN(single)) params.set('val-gt',  single);
+    if (op === 'gte'     && !isNaN(single)) params.set('val-min', single);
+    if (op === 'lt'      && !isNaN(single)) params.set('val-lt',  single);
+    if (op === 'lte'     && !isNaN(single)) params.set('val-max', single);
+    if (op === 'between') {
+      if (!isNaN(vmin)) params.set('val-min', vmin);
+      if (!isNaN(vmax)) params.set('val-max', vmax);
+    }
+  }
+
+  // ── URL building ──────────────────────────────────────────────────────────────
+
+  function buildUrl() {
+    const base   = document.getElementById('serverUrl').value.replace(/\/$/, '');
+    const sensor = currentSensor();
+    const from   = document.getElementById('fromInput').value;
+    const to     = document.getElementById('toInput').value;
+    const params = new URLSearchParams();
+    let urlPath;
+
+    if (currentMode === 'filter') {
+      urlPath = `/${sensor}/readings`;
+      // cols param (only if not all selected / none selected)
+      if (selectedCols.length > 0 && selectedCols.length < currentCols.length) {
+        params.set('cols', selectedCols.join(','));
+      }
+      if (from) params.set('from', from.replace('T', ' '));
+      if (to)   params.set('to',   to.replace('T', ' '));
+      const last = parseInt(document.getElementById('lastInput').value, 10);
+      if (last && last !== 10) params.set('last', last);
+      getValueParams(params);
+
+      const orderVal = document.getElementById('orderSelect').value;
+      const [orderCol, orderDir] = orderVal.split('_');
+      if (orderCol !== 'timestamp' || orderDir !== 'desc') {
+        params.set('order', orderCol);
+        params.set('dir',   orderDir);
+      }
+
+    } else if (currentMode === 'redline') {
+      urlPath = `/hbot-torque/redline`;
+      if (selectedCols[0]) params.set('axis', selectedCols[0]);
+      const threshold = parseInt(document.getElementById('thresholdInput').value, 10);
+      const last      = parseInt(document.getElementById('redlineLastInput').value, 10);
+      if (threshold && threshold !== 80)   params.set('threshold', threshold);
+      if (last      && last      !== 1000) params.set('last', last);
+      if (from) params.set('from', from.replace('T', ' '));
+      if (to)   params.set('to',   to.replace('T', ' '));
+
+    } else {
+      // aggregate
+      urlPath = `/${sensor}/summary`;
+      if (selectedCols[0]) params.set('col', selectedCols[0]);
+      params.set('fn', document.getElementById('fnSelect').value);
+      if (from) params.set('from', from.replace('T', ' '));
+      if (to)   params.set('to',   to.replace('T', ' '));
+    }
+
+    const qs = params.toString();
+    return { base, path: urlPath, qs, full: base + urlPath + (qs ? '?' + qs : '') };
+  }
+
+  function updatePreview() {
+    const { base, path, qs } = buildUrl();
+    document.getElementById('queryPreview').innerHTML =
+      `<span class="method">GET</span> ` +
+      `<span class="url-base">${base}</span>` +
+      `<span class="url-path">${path}</span>` +
+      (qs ? `<span class="url-params">?${qs}</span>` : '');
+  }
+
+  // ── Send request ──────────────────────────────────────────────────────────────
+
+  async function sendRequest() {
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+    const { full } = buildUrl();
+    const card      = document.getElementById('resultsCard');
+    const statusBar = document.getElementById('statusBar');
+    const container = document.getElementById('tableContainer');
+    const rawJson   = document.getElementById('rawJson');
+    card.style.display = '';
+    const t0 = Date.now();
+    $.ajax({
+      url:      full,
+      dataType: 'json',
+      success: function(json, _status, jqXHR) {
+        const ms = Date.now() - t0;
+        statusBar.innerHTML = `<span class="ok">&#10003; ${jqXHR.status} OK</span> &mdash; ${ms} ms`;
+        rawJson.textContent = JSON.stringify(json, null, 2);
+        renderResults(json, container);
+        btn.disabled = false;
+        btn.textContent = 'Send Request';
+      },
+      error: function(jqXHR) {
+        const ms   = Date.now() - t0;
+        const json = jqXHR.responseJSON;
+        if (jqXHR.status > 0) {
+          statusBar.innerHTML = `<span class="err">&#10007; ${jqXHR.status} Error</span> &mdash; ${ms} ms`;
+          rawJson.textContent = JSON.stringify(json, null, 2);
+          container.innerHTML = `<p style="color:#c0392b;padding:8px 0">${json?.error ?? 'Request failed'}</p>`;
+        } else {
+          statusBar.innerHTML = `<span class="err">&#10007; Network error</span>`;
+          container.innerHTML = `<p style="color:#c0392b;padding:8px 0">Could not reach server. Is it running?</p>`;
+          rawJson.textContent = '';
+        }
+        btn.disabled = false;
+        btn.textContent = 'Send Request';
+      }
+    });
+  }
+
+  // ── Render results ────────────────────────────────────────────────────────────
+
+  function renderResults(json, container) {
+
+    if (currentMode === 'aggregate') {
+      const d = json.data;
+      container.innerHTML =
+        `<table id="resultsTable">
+           <tr><th>Sensor</th><th>Column</th><th>Function</th><th>Result</th></tr>
+           <tr><td>${d.sensor}</td><td>${colLabel(d.col)}</td>
+               <td>${d.fn.toUpperCase()}</td>
+               <td><strong>${d.result !== null ? parseFloat(d.result).toFixed(4) : 'null'}</strong></td></tr>
+         </table>`;
+      return;
+    }
+
+    if (currentMode === 'redline') {
+      const items = Array.isArray(json.data) ? json.data : [json.data];
+      if (!items.length) {
+        container.innerHTML = '<p style="color:#888;font-style:italic;padding:8px 0">No data returned.</p>';
+        return;
+      }
+      let html =
+        `<table id="resultsTable">
+           <tr>
+             <th>Axis</th>
+             <th>Max Ever (Nm)</th><th>Min Ever (Nm)</th>
+             <th>+ Limit (${items[0].thresholdPercent}%)</th>
+             <th>&minus; Limit (${items[0].thresholdPercent}%)</th>
+             <th>Readings</th><th>Redline Count</th>
+             <th>Redline %</th><th>Latest Value</th>
+             <th>In Redline</th><th>Status</th>
+           </tr>`;
+      items.forEach(function(d) {
+        const badge = `<span class="badge badge-${d.status}">${d.status.toUpperCase()}</span>`;
+        const inRl  = d.latestInRedline === null ? '&mdash;'
+          : d.latestInRedline
+            ? '<span style="color:#c0392b;font-weight:bold">YES</span>'
+            : '<span style="color:#2a7a2a">no</span>';
+        html +=
+          `<tr>
+             <td><strong>${colLabel(d.axis)}</strong></td>
+             <td>${d.maxEver}</td><td>${d.minEver}</td>
+             <td>${d.positiveLimit}</td><td>${d.negativeLimit}</td>
+             <td>${d.readingsAnalysed}</td><td>${d.redlineCount}</td>
+             <td>${d.redlinePercent}%</td>
+             <td>${d.latestValue !== null ? parseFloat(d.latestValue).toFixed(4) : '&mdash;'}</td>
+             <td>${inRl}</td><td>${badge}</td>
+           </tr>`;
+      });
+      html += '</table>';
+      container.innerHTML = html;
+      return;
+    }
+
+    // ── Filter mode ───────────────────────────────────────────────────────────
+    const rows = json.data ?? [];
+    if (rows.length === 0) {
+      container.innerHTML =
+        '<p style="color:#888;font-style:italic;padding:8px 0">No results returned for this query.</p>';
+      return;
+    }
+    const cols = Object.keys(rows[0]);
+    let html =
+      `<p style="font-size:0.85rem;color:#555;margin-bottom:8px">` +
+      `${rows.length} row${rows.length !== 1 ? 's' : ''} returned</p>`;
+    html += `<table id="resultsTable"><tr>${cols.map(function(c) {
+      return `<th>${colLabel(c)}</th>`;
+    }).join('')}</tr>`;
+    rows.forEach(function(row) {
+      html += '<tr>' + cols.map(function(c) {
+        let val = row[c];
+        if (c === 'timestamp' && val) val = new Date(val).toLocaleString();
+        // format floats
+        if (typeof val === 'number' && !Number.isInteger(val)) val = parseFloat(val).toFixed(4);
+        // format booleans
+        if (val === true)  val = '<span style="color:#2a7a2a;font-weight:bold">true</span>';
+        if (val === false) val = '<span style="color:#888">false</span>';
+        return `<td>${val ?? ''}</td>`;
+      }).join('') + '</tr>';
+    });
+    html += '</table>';
+    container.innerHTML = html;
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────────
+  onSensorChange();   // load columns for the default sensor
+  updatePreview();
+
+  // Re-run preview when server URL changes
+  document.getElementById('serverUrl').addEventListener('input', function() {
+    updatePreview();
+  });
+</script>
+</body>
+</html>

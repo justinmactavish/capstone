@@ -1,0 +1,29 @@
+{
+    "env": {
+        "dbname": "POSTGRESDBNAME",
+        "dbuser": "POSTGRESUSER",
+        "dbpw": "POSTGRESPW",
+        "system_user": "USERNAME",
+        "system_name": "COMPUTERNAME"
+    },
+    "sql": {
+        "host": "192.168.232.31",
+        "port": 3306,
+        "database": "xxx",
+        "user": "xxx",
+        "password": "xxx"
+    },
+    "projectTitle": "hbot-api",
+    "mqtt": {
+        "brokerUrl": "mqtt://192.168.232.31",
+        "mqttPort": 1883,
+        "organization": "magna",
+        "division": "iotacademy",
+        "plant": "conestoga",
+        "area": "smart",
+        "line": "presorter",
+        "workstation": "iot-group1",
+        "type": "h_bot",
+        "baseTopic": "ACADEMY03"
+    }
+}
